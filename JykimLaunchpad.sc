@@ -339,10 +339,18 @@ JykimLaunchpad {
 		|playNoteX, playNoteY, handler|
 		this.prRegisterOnOffPlayNote(playNoteX, playNoteY, handler, noteOnHandlers);
 	}
+	*freeOnPlayNote{
+		|playNoteX, playNoteY|
+		this.prRegisterOnOffPlayNote(playNoteX, playNoteY, nil, noteOnHandlers);
+	}
 
 	*registerOffPlayNote{
 		|playNoteX, playNoteY, handler|
 		this.prRegisterOnOffPlayNote(playNoteX, playNoteY, handler, noteOffHandlers);
+	}
+	*freeOffPlayNote{
+		|playNoteX, playNoteY|
+		this.prRegisterOnOffPlayNote(playNoteX, playNoteY, nil, noteOffHandlers);
 	}
 
 	*prRegisterOnOffPlayNote{
@@ -356,10 +364,18 @@ JykimLaunchpad {
 		|configNoteX, configNoteY, handler|
 		this.prRegisterOnOffConfigNote(configNoteX, configNoteY, handler, noteOnHandlers);
 	}
+	*freeOnConfigNote{
+		|configNoteX, configNoteY|
+		this.prRegisterOnOffConfigNote(configNoteX, configNoteY, nil, noteOnHandlers);
+	}
 
 	*registerOffConfigNote{
 		|configNoteX, configNoteY, handler|
 		this.prRegisterOnOffConfigNote(configNoteX, configNoteY, handler, noteOffHandlers);
+	}
+	*freeOffConfigNote{
+		|configNoteX, configNoteY|
+		this.prRegisterOnOffConfigNote(configNoteX, configNoteY, nil, noteOffHandlers);
 	}
 
 	*prRegisterOnOffConfigNote{
@@ -373,9 +389,18 @@ JykimLaunchpad {
 		|controlX, controlY, handler|
 		this.prRegisterOnOff(controlX, controlY, handler, controlOnHandlers);
 	}
+	*freeOnControl{
+		|controlX, controlY|
+		this.prRegisterOnOff(controlX, controlY, nil, controlOnHandlers);
+	}
+
 	*registerOffControl{
 		|controlX, controlY, handler|
 		this.prRegisterOnOff(controlX, controlY, handler, controlOffHandlers);
+	}
+	*freeOffControl{
+		|controlX, controlY, handler|
+		this.prRegisterOnOff(controlX, controlY, nil, controlOffHandlers);
 	}
 
 	*prRegisterOnOff{
@@ -622,7 +647,132 @@ JykimLaunchpad {
 	}
 }
 
+JykimNumberDisplay {
+	var <numMaps;
+	var <allMap;
+
+	*new {
+		|offsetX, offsetY|
+		var numMapsRaw, numMapsResult, allMapRaw, allMapResult;
+
+		numMapsRaw = this.createNumMaps();
+		numMapsResult = numMapsRaw.collect{
+			|numMap|
+			numMap.collect{
+				|xy|
+				[xy[0] + offsetX, xy[1] + offsetY];
+			};
+		};
+
+		allMapRaw = this.createAllMap();
+		allMapResult = allMapRaw.collect{
+			|xy|
+			[xy[0] + offsetX, xy[1] + offsetY];
+		};
+
+		^super.newCopyArgs(numMapsResult, allMapResult);
+	}
+
+	*createAllMap{
+		^[
+			[0,0],[0,1],[0,2],[0,3],[0,4],
+			[1,0],[1,1],[1,2],[1,3],[1,4],
+			[2,0],[2,1],[2,2],[2,3],[2,4]
+		];
+	}
+
+	*createNumMaps{
+		^[
+			[ // 0
+				[0,0],[0,1],[0,2],[0,3],[0,4],
+				[1, 4],
+				[2,0],[2,1],[2,2],[2,3],[2,4],
+				[1, 0]
+			],
+			[ // 1
+				[2,0],[2,1],[2,2],[2,3],[2,4]
+			],
+			[ // 2
+				[0,4],[1,4],[2,4],
+				[2,3],
+				[0,2],[1,2],[2,2],
+				[0,1],
+				[0,0],[1,0],[2,0]
+			],
+			[ // 3
+				[0,4],[1,4],[2,4],
+				[2,3],
+				[0,2],[1,2],[2,2],
+				[2,1],
+				[0,0],[1,0],[2,0]
+			],
+			[ // 4
+				[0,4],[0,3],[0,2],
+				[1,2],
+				[2,4],[2,3],[2,2],[2,1],[2,0]
+			],
+			[ // 5
+				[0,4],[1,4],[2,4],
+				[0,3],
+				[0,2],[1,2],[2,2],
+				[2,1],
+				[0,0],[1,0],[2,0]
+			],
+			[ // 6
+				[0,0],[0,1],[0,2],[0,3],[0,4],
+				[1,0],[1,2],
+				[2,0],[2,1],[2,2]
+			],
+			[ // 7
+				[0,2],[0,3],[0,4],
+				[1,4],
+				[2,4],[2,3],[2,2],[2,1],[2,0]
+			],
+			[ // 8
+				[0,0],[0,1],[0,2],[0,3],[0,4],
+				[1,0],[1,2],[1,4],
+				[2,0],[2,1],[2,2],[2,3],[2,4]
+			],
+			[ // 9
+				[0,2],[0,3],[0,4],
+				[1,2],[1,4],
+				[2,0],[2,1],[2,2],[2,3],[2,4]
+			]
+		];
+	}
+}
+
 JykimLaunchpadMk2 : JykimLaunchpad{
+	classvar <currentVolume;
+	classvar <currentPan;
+	classvar <currentSendA;
+
+	classvar numDisp;
+	classvar beforeMuteVolume;
+
+	const volumeY = 7;
+	const panY = 6;
+	const sendAY = 5;
+	const muteY = 2;
+
+	const <volumeMin = 0;
+	const <volumeMax = 9;
+
+	const <panMin = 0;
+	const <panMid = 4;
+	const <panMax = 8;
+
+	const <sendAMin = 0;
+	const <sendAMax = 9;
+
+	const numPadStartX = 5;
+	const numPadStartY = 3;
+
+	const arrowUpX = 0;
+	const arrowDownX = 1;
+	const arrowLeftX = 2;
+	const arrowRightX = 3;
+
 	*init {
 		var result;
 		result = super.init;
@@ -631,19 +781,197 @@ JykimLaunchpadMk2 : JykimLaunchpad{
 			^false;
 		});
 
+		// NumberDisplay Object
+		numDisp = JykimNumberDisplay(numPadStartX, numPadStartY);
+
+		// Control Toggle
 		(4..7).do{
 			|controlX|
 			this.setToggleModeControl(controlX, 0);
 		};
 
+		// Control Exclusive
+		this.setExclusiveControl([[4, 0], [5, 0], [6, 0], [7, 0]]);
+
+		// ConfigNote Toggle
 		[0,2,4,5,6,7].do{
 			|configNoteY|
 			this.setToggleModeConfigNote(0, configNoteY);
 		};
 
-		this.setExclusiveConfigNote([[0, 7], [0, 6], [0, 5], [0, 4]]);
-		this.setExclusiveControl([[4, 0], [5, 0], [6, 0], [7, 0]]);
+		// ConfigNote Exclusive
+		this.setExclusiveConfigNote([[0, 7], [0, 6], [0, 5], [0, 4], [0, 2]]);
+
+		// Volume
+		currentVolume = volumeMax;
+		this.registerOnConfigNote(0, volumeY, {
+			this.prVolumeOnHandler(0, volumeY);
+		});
+		this.registerOffConfigNote(0, volumeY, {
+			this.prVolumeOffHandler(0, volumeY);
+		});
+
+		// Pan
+		currentPan = panMid;
+		this.registerOnConfigNote(0, panY, {
+			this.prPanOnHandler(0, panY);
+		});
+		this.registerOffConfigNote(0, panY, {
+			this.prPanOffHandler(0, panY);
+		});
+
+		// SendA (ReverbA)
+		currentSendA = sendAMin;
+		this.registerOnConfigNote(0, sendAY, {
+			this.prSendAOnHandler(0, sendAY);
+		});
+		this.registerOffConfigNote(0, sendAY, {
+			this.prSendAOffHandler(0, sendAY);
+		});
+
+		// Mute
+		this.registerOnConfigNote(0, muteY, {
+			this.prMuteOnHandler();
+		});
+		this.registerOffConfigNote(0, muteY, {
+			this.prMuteOffHandler();
+		});
+
 
 		^result;
 	}
+
+	////////////////////////////////////////////////////////////////////////////
+
+	*offNumPad{
+		numDisp.allMap.do{
+			|xy|
+			this.offColorPlayNote(xy[0], xy[1]);
+		};
+	}
+
+	*onNumPad{
+		|num, color = 2|
+		var numMap;
+
+		this.offNumPad();
+
+		if((num < 0) || (num > 9), {
+			^false;
+		});
+
+		numMap = numDisp.numMaps[num];
+		numMap.do{
+			|xy|
+			this.onColorPlayNote(xy[0], xy[1], color);
+		};
+	}
+
+	////////////////////////////////////////////////////////////////////////////
+
+	*prVolumeOnHandler{
+		|configNoteX, configNoteY|
+		var xy, color;
+
+		xy = this.configNoteXY2NoteXY(configNoteX, configNoteY);
+		color = noteColors[xy[0], xy[1]];
+
+		this.onNumPad(currentVolume, color);
+
+		this.registerOnControl(arrowUpX, 0, {
+			if (currentVolume < volumeMax, {
+				currentVolume = currentVolume + 1;
+			});
+			this.onNumPad(currentVolume, color);
+		});
+		this.registerOnControl(arrowDownX, 0, {
+			if (currentVolume > volumeMin,{
+				currentVolume = currentVolume - 1;
+			});
+			this.onNumPad(currentVolume, color);
+		});
+	}
+
+	*prVolumeOffHandler{
+		|configNoteX, configNoteY|
+		this.offNumPad();
+		this.freeOnControl(arrowUpX, 0);
+		this.freeOnControl(arrowDownX, 0);
+	}
+
+	////////////////////////////////////////////////////////////////////////////
+
+	*prPanOnHandler{
+		|configNoteX, configNoteY|
+		var xy, color;
+
+		xy = this.configNoteXY2NoteXY(configNoteX, configNoteY);
+		color = noteColors[xy[0], xy[1]];
+
+		this.onNumPad(currentPan, color);
+
+		this.registerOnControl(arrowRightX, 0, {
+			if (currentPan < panMax, {
+				currentPan = currentPan + 1;
+			});
+			this.onNumPad(currentPan, color);
+		});
+		this.registerOnControl(arrowLeftX, 0, {
+			if (currentPan > panMin,{
+				currentPan = currentPan - 1;
+			});
+			this.onNumPad(currentPan, color);
+		});
+	}
+
+	*prPanOffHandler{
+		|configNoteX, configNoteY|
+		this.offNumPad();
+		this.freeOnControl(arrowRightX, 0);
+		this.freeOnControl(arrowLeftX, 0);
+	}
+
+	////////////////////////////////////////////////////////////////////////////
+
+	*prSendAOnHandler{
+		|configNoteX, configNoteY|
+		var xy, color;
+
+		xy = this.configNoteXY2NoteXY(configNoteX, configNoteY);
+		color = noteColors[xy[0], xy[1]];
+
+		this.onNumPad(currentSendA, color);
+
+		this.registerOnControl(arrowUpX, 0, {
+			if (currentSendA < sendAMax, {
+				currentSendA = currentSendA + 1;
+			});
+			this.onNumPad(currentSendA, color);
+		});
+		this.registerOnControl(arrowDownX, 0, {
+			if (currentSendA > sendAMin,{
+				currentSendA = currentSendA - 1;
+			});
+			this.onNumPad(currentSendA, color);
+		});
+	}
+
+	*prSendAOffHandler{
+		|configNoteX, configNoteY|
+		this.offNumPad();
+		this.freeOnControl(arrowUpX, 0);
+		this.freeOnControl(arrowDownX, 0);
+	}
+
+	////////////////////////////////////////////////////////////////////////////
+
+	*prMuteOnHandler{
+		beforeMuteVolume = currentVolume;
+		currentVolume = 0;
+	}
+
+	*prMuteOffHandler{
+		currentVolume = beforeMuteVolume;
+	}
 }
+
