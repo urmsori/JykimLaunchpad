@@ -2,19 +2,24 @@ JykimLaunchpad {
 	classvar <> padOut;
 	classvar printVerbose;
 
-	classvar onNoteHandlers;
-	classvar offNoteHandlers;
+	classvar noteOnHandlers;
+	classvar noteOffHandlers;
 	classvar noteColors;
 	classvar noteModes;
+	classvar noteExclusives;
 
-	classvar onControlHandlers;
-	classvar offControlHandlers;
+	classvar controlOnHandlers;
+	classvar controlOffHandlers;
 	classvar controlColors;
 	classvar controlModes;
+	classvar controlExclusives;
 
-	const <modeOnOff= 0;
-	const <modeToggleOff = 1;
-	const <modeToggleOn = 2;
+	const midiTypeNote = 0;
+	const midiTypeControl = 1;
+
+	const modeOnOff= 0;
+	const modeToggleOff = 1;
+	const modeToggleOn = 2;
 
 	const <countPlayNoteX = 8;
 	const <countPlayNoteY = 8;
@@ -22,7 +27,7 @@ JykimLaunchpad {
 	const <countConfigNoteY = 8;
 	const <countNoteX = 10;
 	const <countNoteY = 8;
-	const <numMidiStart = 11;
+	const <numNoteStart = 11;
 
 	const <countControlX = 8;
 	const <countControlY = 1;
@@ -49,15 +54,17 @@ JykimLaunchpad {
 
 		this.printVerboseOff();
 
-		onNoteHandlers = Array2D.new(countNoteX, countNoteY);
-		offNoteHandlers = Array2D.new(countNoteX, countNoteY);
+		noteOnHandlers = Array2D.new(countNoteX, countNoteY);
+		noteOffHandlers = Array2D.new(countNoteX, countNoteY);
 		noteColors = Array2D.new(countNoteX, countNoteY);
 		noteModes = Array2D.new(countNoteX, countNoteY);
+		noteExclusives = Array2D.new(countNoteX, countNoteY);
 
-		onControlHandlers = Array2D.new(countControlX, countControlY);
-		offControlHandlers = Array2D.new(countControlX, countControlY);
+		controlOnHandlers = Array2D.new(countControlX, countControlY);
+		controlOffHandlers = Array2D.new(countControlX, countControlY);
 		controlColors = Array2D.new(countControlX, countControlY);
 		controlModes = Array2D.new(countControlX, countControlY);
+		controlExclusives = Array2D.new(countControlX, countControlY);
 
 		countNoteX.do{
 			|x|
@@ -94,90 +101,141 @@ JykimLaunchpad {
 
 			MIDIdef.noteOn(\JykimLaunchpadNoteOn, {
 				|veloc, num, chan, src|
-				this.noteOnOffHandler(veloc, num, chan, src, onNoteHandlers, true);
+				this.prNoteOnOffHandler(veloc, num, chan, src, true);
 			});
 			MIDIdef.noteOff(\JykimLaunchpadNoteOff, {
 				|veloc, num, chan, src|
-				this.noteOnOffHandler(veloc, num, chan, src, offNoteHandlers, false);
+				this.prNoteOnOffHandler(veloc, num, chan, src, false);
 			});
 			MIDIdef.cc(\JykimLaunchpadCC, {
 				|veloc, num, chan, src|
 				if (veloc > 0, {
-					this.controlOnOffHandler(veloc, num, chan, src, true);
+					this.prControlOnOffHandler(veloc, num, chan, src, true);
 				},{
-					this.controlOnOffHandler(veloc, num, chan, src, false);
+					this.prControlOnOffHandler(veloc, num, chan, src, false);
 				})
 			});
 
-			this.setAllColor(this.red, this.grey, this.grey);
-			this.offAllColor();
-
-			(4..7).do{
-				|controlX|
-				this.setControlToggleMode(controlX, 0);
-			};
-
-			countConfigNoteY.do{
-				|configNoteY|
-				this.setConfigNoteToggleMode(0, configNoteY);
-			};
-
+			this.setColorAll(this.red, this.grey, this.grey);
+			this.offColorAll();
 
 			midiSource.name.post;
 			" is connected".postln;
+			^true
 		}, {
 			"Launchpad Not available".postln;
+			^false
 		});
 	}
 
-	*noteOnOffHandler{
-		|veloc, num, chan, src, handlers, isOn|
-		var index, x, y, handler, color;
+	////////////////////////////////////////////////////////////////////////////
 
-		if ( printVerbose, {
-			[veloc, num, chan, src].postln;
-		});
+	*num2NoteXY{
+		|num|
+		var index, x, y;
 
-		index = num - numMidiStart;
+		index = num - numNoteStart;
 		x = index % countNoteX;
 		y = index / countNoteX;
 		y = y.asInteger();
 
-		this.modeRouter(x, y, isOn, noteModes, onNoteHandlers, offNoteHandlers, {
-			|x, y, color|
-			this.onNoteColor(x, y, color);
-		}, {
-			|x, y|
-			this.offNoteColor(x, y);
-		}, noteColors);
+		^[x, y];
 	}
 
-	*controlOnOffHandler{
-		|veloc, num, chan, src, isOn|
+	*num2ControlXY{
+		|num|
 		var index, x, y;
-
-		if ( printVerbose, {
-			[veloc, num, chan, src].postln;
-		});
 
 		index = num - numControlStart;
 		x = index % countControlX;
 		y = index / countControlX;
 		y = y.asInteger();
 
-		this.modeRouter(x, y, isOn, controlModes, onControlHandlers, offControlHandlers, {
-			|x, y, color|
-			this.onControlColor(x,y,color);
-		}, {
-			|x, y|
-			this.offControlColor(x, y);
-		}, controlColors);
+		^[x, y];
 	}
 
-	*modeRouter{
-		|x, y, isOn, modes, onHandlers, offHandlers, onColorFunc, offColorFunc, colors|
-		var mode;
+	*controlXY2Num{
+		|controlX, controlY|
+		var num;
+		num = (controlY * countControlX) + controlX + numControlStart;
+		^num;
+	}
 
+	*noteXY2Num{
+		|x, y|
+		var num;
+		num = (y * countNoteX) + x + numNoteStart;
+		^num;
+	}
+
+	*playNoteXY2NoteXY{
+		|playNoteX, playNoteY|
+		var x, y;
+		x = playNoteX;
+		y = playNoteY;
+		^[x, y];
+	}
+
+	*configNoteXY2NoteXY{
+		|configNoteX, configNoteY|
+		var x, y;
+		x = configNoteX + countPlayNoteX;
+		y = configNoteY;
+		^[x, y];
+	}
+
+	*playNoteXY2Num{
+		|playNoteX, playNoteY|
+		var xy, num;
+		xy = this.playNoteXY2NoteXY(playNoteX, playNoteY);
+		num = this.noteXY2Num(xy[0], xy[1]);
+		^num;
+	}
+
+	*configNoteXY2Num{
+		|configNoteX, configNoteY|
+		var xy, num;
+		xy = this.playNoteXY2NoteXY(configNoteX, configNoteY);
+		num = this.noteXY2Num(xy[0], xy[1]);
+		^num;
+	}
+
+	////////////////////////////////////////////////////////////////////////////
+
+	*prNoteOnOffHandler{
+		|veloc, num, chan, src, isOn|
+		var xy, x, y;
+
+		xy = this.num2NoteXY(num);
+		x = xy[0];
+		y = xy[1];
+
+		this.prModeRouter(x, y, midiTypeNote, isOn);
+	}
+
+	*prControlOnOffHandler{
+		|veloc, num, chan, src, isOn|
+		var xy, x, y;
+
+		if ( printVerbose, {
+			[veloc, num, chan, src].postln;
+		});
+
+		xy = this.num2ControlXY(num);
+		x = xy[0];
+		y = xy[1];
+
+		this.prModeRouter(x, y, midiTypeControl, isOn);
+	}
+
+	*prModeRouter{
+		|x, y, midiType, isOn|
+		var modes, mode;
+
+		modes = switch (midiType,
+			midiTypeNote,   { noteModes },
+			midiTypeControl, { controlModes }
+		);
 		mode = modes[x, y];
 
 		if ( printVerbose, {
@@ -185,31 +243,38 @@ JykimLaunchpad {
 		});
 
 		if ( mode == modeOnOff,{
-			this.onOffChanger(x, y, isOn, onHandlers, offHandlers, onColorFunc, offColorFunc, colors);
+			this.prOnOffChanger(x, y, midiType, isOn);
 		});
 
 		if (isOn,{
 			if ( mode == modeToggleOff, {
-				this.onOffChanger(x, y, true, onHandlers, offHandlers, onColorFunc, offColorFunc, colors);
+				this.prOffExclusive(x, y, midiType);
+				this.prOnOffChanger(x, y, midiType, true);
 				modes[x, y] = modeToggleOn;
 			});
 
 			if ( mode == modeToggleOn, {
-				this.onOffChanger(x, y, false, onHandlers, offHandlers, onColorFunc, offColorFunc, colors);
+				this.prOnOffChanger(x, y, midiType, false);
 				modes[x, y] = modeToggleOff;
 			});
 		});
 	}
 
 
-	*onOffChanger{
-		|x, y, isOn, onHandlers, offHandlers, onColorFunc, offColorFunc, colors|
+	*prOnOffChanger{
+		|x, y, midiType, isOn|
 		var handlers, handler, color;
 
 		if (isOn, {
-			handlers = onHandlers;
+			handlers = switch (midiType,
+				midiTypeNote,   { noteOnHandlers },
+				midiTypeControl, { controlOnHandlers }
+			);
 		},{
-			handlers = offHandlers;
+			handlers = switch (midiType,
+				midiTypeNote,   { noteOffHandlers },
+				midiTypeControl, { controlOffHandlers }
+			);
 		});
 
 		handler = handlers[x, y];
@@ -217,67 +282,103 @@ JykimLaunchpad {
 			handler.value();
 		});
 
-		color = colors[x, y];
+		color = switch (midiType,
+			midiTypeNote,   { noteColors[x, y] },
+			midiTypeControl, { controlColors[x, y] }
+		);
 		if ( color.notNil, {
 			if ( isOn, {
-				onColorFunc.value(x, y, color);
+				switch (midiType,
+					midiTypeNote,   { this.onColorNote(x,y,color); },
+					midiTypeControl, { this.onColorControl(x,y,color); }
+				);
 			}, {
-				offColorFunc.value(x, y);
+				switch (midiType,
+					midiTypeNote,   { this.offColorNote(x,y); },
+					midiTypeControl, { this.offColorControl(x,y); }
+				);
 			});
 		});
-
 	}
 
-	*registerPlayNoteOn{
+	*prOffExclusive{
+		|x, y, midiType|
+		var modes, exclusive;
+
+		exclusive = switch (midiType,
+			midiTypeNote,   { noteExclusives[x, y] },
+			midiTypeControl, { controlExclusives[x, y] }
+		);
+
+		if (exclusive.isNil,{
+			^nil;
+		});
+
+		modes = switch (midiType,
+			midiTypeNote,   { noteModes },
+			midiTypeControl, { controlModes }
+		);
+
+		exclusive.do{
+			|xy|
+			var mode, xOther, yOther;
+			xOther = xy[0];
+			yOther = xy[1];
+			if((xOther != x) || (yOther != y),{
+				mode = modes[xOther, yOther];
+				if(mode == modeToggleOn, {
+					this.prModeRouter(xOther, yOther, midiType, true);
+				});
+			});
+		};
+	}
+
+	////////////////////////////////////////////////////////////////////////////
+
+	*registerOnPlayNote{
 		|playNoteX, playNoteY, handler|
-		this.registerPlayNoteOnOff(playNoteX, playNoteY, handler, onNoteHandlers);
+		this.prRegisterOnOffPlayNote(playNoteX, playNoteY, handler, noteOnHandlers);
 	}
 
-	*registerPlayNoteOff{
+	*registerOffPlayNote{
 		|playNoteX, playNoteY, handler|
-		this.registerPlayNoteOnOff(playNoteX, playNoteY, handler, offNoteHandlers);
+		this.prRegisterOnOffPlayNote(playNoteX, playNoteY, handler, noteOffHandlers);
 	}
 
-	*registerPlayNoteOnOff{
+	*prRegisterOnOffPlayNote{
 		|playNoteX, playNoteY, handler, noteHandlers|
-		var x, y, noteHandler;
-
-		x = playNoteX;
-		y = playNoteY;
-
-		this.registerOnOff(x, y, handler, noteHandlers);
+		var xy, noteHandler;
+		xy = this.playNoteXY2NoteXY(playNoteX, playNoteY);
+		this.prRegisterOnOff(xy[0], xy[1], handler, noteHandlers);
 	}
 
-	*registerConfigNoteOn{
+	*registerOnConfigNote{
 		|configNoteX, configNoteY, handler|
-		this.registerConfigNoteOnOff(configNoteX, configNoteY, handler, onNoteHandlers);
+		this.prRegisterOnOffConfigNote(configNoteX, configNoteY, handler, noteOnHandlers);
 	}
 
-	*registerConfigNoteOff{
+	*registerOffConfigNote{
 		|configNoteX, configNoteY, handler|
-		this.registerConfigNoteOnOff(configNoteX, configNoteY, handler, offNoteHandlers);
+		this.prRegisterOnOffConfigNote(configNoteX, configNoteY, handler, noteOffHandlers);
 	}
 
-	*registerConfigNoteOnOff{
+	*prRegisterOnOffConfigNote{
 		|configNoteX, configNoteY, handler, noteHandlers|
-		var x, y, noteHandler;
-
-		x = configNoteX + countPlayNoteX;
-		y = configNoteY;
-
-		this.registerOnOff(x, y, handler, noteHandlers);
+		var xy, noteHandler;
+		xy = this.configNoteXY2NoteXY(configNoteX, configNoteY);
+		this.prRegisterOnOff(xy[0], xy[1], handler, noteHandlers);
 	}
 
-	*registerControlOn{
+	*registerOnControl{
 		|controlX, controlY, handler|
-		this.registerOnOff(controlX, controlY, handler, onControlHandlers);
+		this.prRegisterOnOff(controlX, controlY, handler, controlOnHandlers);
 	}
-	*registerControlOff{
+	*registerOffControl{
 		|controlX, controlY, handler|
-		this.registerOnOff(controlX, controlY, handler, offControlHandlers);
+		this.prRegisterOnOff(controlX, controlY, handler, controlOffHandlers);
 	}
 
-	*registerOnOff{
+	*prRegisterOnOff{
 		|x, y, handler, noteHandlers|
 		var noteHandler;
 
@@ -289,171 +390,260 @@ JykimLaunchpad {
 		noteHandlers[x,y] = handler;
 	}
 
-	*setPlayNoteColor{
+	////////////////////////////////////////////////////////////////////////////
+
+	*setColorPlayNote{
 		|playNoteX, playNoteY, color|
-		var x, y;
-
-		x = playNoteX;
-		y = playNoteY;
-		noteColors[x,y] = color;
+		var xy;
+		xy = this.playNoteXY2NoteXY(playNoteX, playNoteY);
+		noteColors[xy[0], xy[1]] = color;
 	}
 
-	*setConfigNoteColor{
+	*setColorConfigNote{
 		|configNoteX, configNoteY, color|
-		var x, y;
-
-		x = configNoteX + countPlayNoteX;
-		y = configNoteY;
-		noteColors[x,y] = color;
+		var xy;
+		xy = this.configNoteXY2NoteXY(configNoteX, configNoteY);
+		noteColors[xy[0], xy[1]] = color;
 	}
 
-	*setControlColor{
+	*setColorControl{
 		|controlX, controlY, color|
 		controlColors[controlX,controlY] = color;
 	}
 
-	*setAllColor{
+	*setColorAll{
 		|playNoteColor, configNoteColor, controlColor|
 		countPlayNoteX.do{
 			|x|
 			countPlayNoteY.do{
 				|y|
-				this.setPlayNoteColor(x,y, playNoteColor);
+				this.setColorPlayNote(x,y, playNoteColor);
 			}
 		};
 		countConfigNoteX.do{
 			|x|
 			countConfigNoteY.do{
 				|y|
-				this.setConfigNoteColor(x,y, configNoteColor);
+				this.setColorConfigNote(x,y, configNoteColor);
 			}
 		};
 		countControlX.do{
 			|x|
 			countControlY.do{
 				|y|
-				this.setControlColor(x,y, controlColor);
+				this.setColorControl(x,y, controlColor);
 			}
 		};
 	}
 
-	*offAllColor{
+	////////////////////////////////////////////////////////////////////////////
+
+	*offColorAll{
 		countNoteX.do{
 			|x|
 			countNoteY.do{
 				|y|
-				this.offNoteColor(x, y);
+				this.offColorNote(x, y);
 			}
 		};
 		countControlX.do{
 			|x|
 			countControlY.do{
 				|y|
-				this.offControlColor(x, y);
+				this.offColorControl(x, y);
 			}
 		};
 	}
 
-	*onNoteColorRaw{
+	*prOnColorNote{
 		|num, color|
 		padOut.noteOn(0, num, color);
 	}
-	*onNoteColor{
+	*onColorNote{
 		|x, y, color|
 		var num;
-		num = (y * countNoteX) + x + numMidiStart;
-		this.onNoteColorRaw(num, color);
+		num = this.noteXY2Num(x, y);
+		this.prOnColorNote(num, color);
 	}
-	*onPlayNoteColor{
+	*onColorPlayNote{
 		|playNoteX, playNoteY, color|
-		var x, y;
-		x = playNoteX;
-		y = playNoteY;
-		this.onNoteColorRaw(x, y, color);
+		var num;
+		num = this.playNoteXY2Num(playNoteX, playNoteY);
+		this.prOnColorNote(num, color);
 	}
-	*onConfigNoteColor{
+	*onColorConfigNote{
 		|configNoteX, configNoteY, color|
-		var x, y;
-		x = configNoteX + countPlayNoteX;
-		y = configNoteY;
-		this.onNoteColorRaw(x, y, color);
+		var num;
+		num = this.configNoteXY2Num(configNoteX, configNoteY);
+		this.prOnColorNote(num, color);
 	}
 
-	*offNoteColorRaw{
+	*prOffColorNote{
 		|num|
 		padOut.noteOff(0, num, 0);
 	}
-	*offNoteColor{
+	*offColorNote{
 		|x, y|
 		var num;
-		num = (y * countNoteX) + x + numMidiStart;
-		this.offNoteColorRaw(num);
+		num = this.noteXY2Num(x, y);
+		this.prOffColorNote(num);
 	}
-	*offPlayNoteColor{
+	*offColorPlayNote{
 		|playNoteX, playNoteY|
-		var x, y;
-		x = playNoteX;
-		y = playNoteY;
-		this.offNoteColorRaw(x, y);
+		var num;
+		num = this.playNoteXY2Num(playNoteX, playNoteY);
+		this.prOffColorNote(num);
 	}
-	*offConfigNoteColor{
+	*offColorConfigNote{
 		|configNoteX, configNoteY|
-		var x, y;
-		x = configNoteX + countPlayNoteX;
-		y = configNoteY;
-		this.offNoteColorRaw(x, y);
+		var num;
+		num = this.configNoteXY2Num(configNoteX, configNoteY);
+		this.prOffColorNote(num);
 	}
 
-	*onControlColorRaw{
+	*prOnColorControl{
 		|num, color|
 		padOut.control(0, num, color);
 	}
-	*onControlColor{
+	*onColorControl{
 		|controlX, controlY, color|
 		var num;
-		num = (controlY * countControlX) + controlX + numControlStart;
-		this.onControlColorRaw(num, color);
+		num = this.controlXY2Num(controlX, controlY);
+		this.prOnColorControl(num, color);
 	}
 
-	*offControlColorRaw{
+	*prOffColorControl{
 		|num|
 		padOut.control(0, num, 0);
 	}
-	*offControlColor{
+	*offColorControl{
 		|controlX, controlY|
 		var num;
-		num = (controlY * countControlX) + controlX + numControlStart;
-		this.offControlColorRaw(num);
+		num = this.controlXY2Num(controlX, controlY);
+		this.prOffColorControl(num);
 	}
 
-	*setNoteToggleMode{
+	////////////////////////////////////////////////////////////////////////////
+
+	*setToggleModeNote{
 		|x, y|
 		noteModes[x, y] = modeToggleOff;
 	}
-	*setPlayNoteToggleMode{
+	*setToggleModePlayNote{
 		|playNoteX, playNoteY|
-		var x, y;
-		x = playNoteX;
-		y = playNoteY;
-		this.setNoteToggleMode(x, y);
+		var xy;
+		xy = this.playNoteXY2NoteXY(playNoteX, playNoteY);
+		this.setToggleModeNote(xy[0], xy[1]);
 	}
-	*setConfigNoteToggleMode{
+	*setToggleModeConfigNote{
 		|configNoteX, configNoteY, color|
-		var x, y;
-		x = configNoteX + countPlayNoteX;
-		y = configNoteY;
-		this.setNoteToggleMode(x, y);
+		var xy;
+		xy = this.configNoteXY2NoteXY(configNoteX, configNoteY);
+		this.setToggleModeNote(xy[0], xy[1]);
 	}
-	*setControlToggleMode{
+	*setToggleModeControl{
 		|controlX, controlY|
 		controlModes[controlX, controlY] = modeToggleOff;
 	}
 
+	////////////////////////////////////////////////////////////////////////////
+
+	*setExclusiveConfigNote{
+		|configNoteXYs|
+		this.prSetUnsetExclusiveConfigNote(configNoteXYs, true);
+	}
+	*unsetExclusiveConfigNote{
+		|configNoteXYs|
+		this.prSetUnsetExclusiveConfigNote(configNoteXYs, false);
+	}
+	*prSetUnsetExclusiveConfigNote{
+		|configNoteXYs, isSet|
+		var xys;
+		xys = configNoteXYs.collect{
+			|configNoteXY|
+			this.configNoteXY2NoteXY(configNoteXY[0], configNoteXY[1]);
+		};
+		this.prSetUnsetExclusive(xys, noteExclusives, isSet);
+	}
+
+	*setExclusivePlayNote{
+		|playNoteXYs|
+		this.prSetUnsetExclusivePlayNote(playNoteXYs, true);
+	}
+	*unsetExclusivePlayNote{
+		|playNoteXYs|
+		this.prSetUnsetExclusivePlayNote(playNoteXYs, false);
+	}
+	*prSetUnsetExclusivePlayNote{
+		|playNoteXYs, isSet|
+		var xys;
+		xys = playNoteXYs.collect{
+			|playNoteXY|
+			this.playNoteXY2NoteXY(playNoteXY[0], playNoteXY[1]);
+		};
+		this.prSetUnsetExclusive(xys, noteExclusives, isSet);
+	}
+
+	*setExclusiveControl{
+		|controlXYs|
+		this.prSetUnsetExclusiveControl(controlXYs, true);
+	}
+	*unsetExclusiveControl{
+		|controlXYs|
+		this.prSetUnsetExclusiveControl(controlXYs, false);
+	}
+	*prSetUnsetExclusiveControl{
+		|controlXYs, isSet|
+		this.prSetUnsetExclusive(controlXYs, controlExclusives, isSet);
+	}
+
+	*prSetUnsetExclusive{
+		|xys, exclusives, isSet|
+		var setValue;
+		if (isSet, {
+			setValue = xys;
+		},{
+			setValue = nil;
+		});
+		xys.do{
+			|xy|
+			exclusives[xy[0], xy[1]] = setValue;
+		}
+	}
+
+	////////////////////////////////////////////////////////////////////////////
+
 	*midicpsPlayNote{
-		|playNoteX, playNoteY, offset = 11|
+		|playNoteX, playNoteY, offset = 0|
 		var num;
-		num = (playNoteY * countPlayNoteX) + playNoteX;
+		num = this.playNoteXY2Num(playNoteX, playNoteY);
 		num = num + offset;
 		^num.midicps;
+	}
+}
+
+JykimLaunchpadMk2 : JykimLaunchpad{
+	*init {
+		var result;
+		result = super.init;
+
+		if (result.not,{
+			^false;
+		});
+
+		(4..7).do{
+			|controlX|
+			this.setToggleModeControl(controlX, 0);
+		};
+
+		[0,2,4,5,6,7].do{
+			|configNoteY|
+			this.setToggleModeConfigNote(0, configNoteY);
+		};
+
+		this.setExclusiveConfigNote([[0, 7], [0, 6], [0, 5], [0, 4]]);
+		this.setExclusiveControl([[4, 0], [5, 0], [6, 0], [7, 0]]);
+
+		^result;
 	}
 }
