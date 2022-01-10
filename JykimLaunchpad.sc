@@ -746,24 +746,39 @@ JykimLaunchpadMk2 : JykimLaunchpad{
 	classvar <currentVolume;
 	classvar <currentPan;
 	classvar <currentSendA;
+	classvar <currentSendB;
+
+	classvar <busSendA;
+	classvar <busSendB;
+	classvar <busMaster;
+	classvar <group;
+	classvar groupEffect;
+	classvar groupMaster;
 
 	classvar numDisp;
 	classvar beforeMuteVolume;
 
+	classvar <synthPlayNotes;
+	classvar <synthMaster;
+	classvar <synthSendA;
+	classvar <synthSendB;
+
 	const volumeY = 7;
 	const panY = 6;
 	const sendAY = 5;
+	const sendBY = 4;
+	const stopY = 3;
 	const muteY = 2;
 
 	const <volumeMin = 0;
 	const <volumeMax = 9;
-
 	const <panMin = 0;
 	const <panMid = 4;
 	const <panMax = 8;
-
 	const <sendAMin = 0;
 	const <sendAMax = 9;
+	const <sendBMin = 0;
+	const <sendBMax = 9;
 
 	const numPadStartX = 5;
 	const numPadStartY = 3;
@@ -820,13 +835,33 @@ JykimLaunchpadMk2 : JykimLaunchpad{
 			this.prPanOffHandler(0, panY);
 		});
 
-		// SendA (ReverbA)
+		// SendA (EffectA)
 		currentSendA = sendAMin;
 		this.registerOnConfigNote(0, sendAY, {
 			this.prSendAOnHandler(0, sendAY);
 		});
 		this.registerOffConfigNote(0, sendAY, {
 			this.prSendAOffHandler(0, sendAY);
+		});
+
+		// SendB (EffectB)
+		currentSendB = sendBMin;
+		this.registerOnConfigNote(0, sendBY, {
+			this.prSendBOnHandler(0, sendBY);
+		});
+		this.registerOffConfigNote(0, sendBY, {
+			this.prSendBOffHandler(0, sendBY);
+		});
+
+		// Stop
+		this.registerOnConfigNote(0, stopY, {
+			countPlayNoteX.do{
+				|x|
+				countPlayNoteY.do{
+					|y|
+					this.synthFree(x, y);
+				}
+			}
 		});
 
 		// Mute
@@ -837,8 +872,125 @@ JykimLaunchpadMk2 : JykimLaunchpad{
 			this.prMuteOffHandler();
 		});
 
+		// Bus
+		if (busSendA.notNil, {
+			busSendA.free;
+		});
+		busSendA = Bus.audio(Server.default, 1);
+
+		if (busSendB.notNil, {
+			busSendB.free;
+		});
+		busSendB = Bus.audio(Server.default, 1);
+
+		if (busMaster.notNil, {
+			busMaster.free;
+		});
+		busMaster = Bus.audio(Server.default, 1);
+
+		if (group.notNil,{
+			group.free;
+		});
+		group = Group.new;
+
+		if (groupEffect.notNil,{
+			groupEffect.free;
+		});
+		groupEffect = Group.after(group);
+
+		if (groupMaster.notNil,{
+			groupMaster.free;
+		});
+		groupMaster = Group.after(groupEffect);
+
+		// synthMaster
+		SynthDef.new("launchpad-Master", {
+			|outBus = 0, inBus, volume, pan|
+			var input, left, right, panVal;
+			input = In.ar(inBus, 1);
+			input = input * ((volume / volumeMax)**2);
+
+			panVal = (pan - panMid) / (panMid - panMin);
+			panVal.postln;
+			input = Pan2.ar(input, panVal);
+
+			Out.ar(outBus, input);
+		}).add;
+
+		// Synth Init
+		synthPlayNotes = Array2D.new(countPlayNoteX, countPlayNoteY);
+
+		Routine {
+			"Waited for init launchpad synth".postln;
+			1.wait;
+			this.init_synth;
+			"Init launchpad synth done".postln;
+		}.play;
+
+		// synthSendA
+		this.setSendAEffect({
+			|outBus, inBus, sendA|
+			var input;
+			input = In.ar(inBus, 1);
+			Out.ar(outBus, input);
+		});
+
+		// synthSendB
+		this.setSendBEffect({
+			|outBus, inBus, sendB|
+			var input;
+			input = In.ar(inBus, 1);
+			Out.ar(outBus, input);
+		});
 
 		^result;
+	}
+
+	*init_synth {
+		// synthMaster
+		if (synthMaster.notNil,{
+			synthMaster.free;
+		});
+		synthMaster = Synth.new("launchpad-Master",
+			[
+				\inBus, busMaster,
+				\volume, currentVolume,
+				\pan, currentPan
+			],
+			groupMaster, \addToTail
+		);
+	}
+
+	////////////////////////////////////////////////////////////////////////////
+	*getSynthDefName{
+		|playNoteX, playNoteY|
+		var synthDefName;
+		^format("launchpad-Sound-%-%", playNoteX, playNoteY);
+	}
+
+	*synthDef{
+		|playNoteX, playNoteY, func|
+		var synthDefName;
+		synthDefName = this.getSynthDefName(playNoteX, playNoteY);
+		^SynthDef(synthDefName, func);
+	}
+
+	*synthNew{
+		|playNoteX, playNoteY, args, addAction = 'addToHead'|
+		var synthDefName, synth;
+		synthDefName = this.getSynthDefName(playNoteX, playNoteY);
+		synth = Synth.new(synthDefName, args, group, addAction);
+		synthPlayNotes[playNoteX, playNoteY] = synth;
+		^synth;
+	}
+
+	*synthFree{
+		|playNoteX, playNoteY|
+		var synth;
+		if (synthPlayNotes[playNoteX, playNoteY].notNil,{
+			synthPlayNotes[playNoteX, playNoteY].free;
+		});
+		synthPlayNotes[playNoteX, playNoteY] = nil;
 	}
 
 	////////////////////////////////////////////////////////////////////////////
@@ -869,6 +1021,12 @@ JykimLaunchpadMk2 : JykimLaunchpad{
 
 	////////////////////////////////////////////////////////////////////////////
 
+	*setVolume{
+		|volume|
+		currentVolume = volume;
+		synthMaster.set(\volume, currentVolume);
+	}
+
 	*prVolumeOnHandler{
 		|configNoteX, configNoteY|
 		var xy, color;
@@ -880,13 +1038,13 @@ JykimLaunchpadMk2 : JykimLaunchpad{
 
 		this.registerOnControl(arrowUpX, 0, {
 			if (currentVolume < volumeMax, {
-				currentVolume = currentVolume + 1;
+				this.setVolume(currentVolume + 1);
 			});
 			this.onNumPad(currentVolume, color);
 		});
 		this.registerOnControl(arrowDownX, 0, {
 			if (currentVolume > volumeMin,{
-				currentVolume = currentVolume - 1;
+				this.setVolume(currentVolume - 1);
 			});
 			this.onNumPad(currentVolume, color);
 		});
@@ -901,6 +1059,12 @@ JykimLaunchpadMk2 : JykimLaunchpad{
 
 	////////////////////////////////////////////////////////////////////////////
 
+	*setPan{
+		|pan|
+		currentPan = pan;
+		synthMaster.set(\pan, currentPan);
+	}
+
 	*prPanOnHandler{
 		|configNoteX, configNoteY|
 		var xy, color;
@@ -912,13 +1076,13 @@ JykimLaunchpadMk2 : JykimLaunchpad{
 
 		this.registerOnControl(arrowRightX, 0, {
 			if (currentPan < panMax, {
-				currentPan = currentPan + 1;
+				this.setPan(currentPan + 1);
 			});
 			this.onNumPad(currentPan, color);
 		});
 		this.registerOnControl(arrowLeftX, 0, {
 			if (currentPan > panMin,{
-				currentPan = currentPan - 1;
+				this.setPan(currentPan - 1);
 			});
 			this.onNumPad(currentPan, color);
 		});
@@ -933,6 +1097,40 @@ JykimLaunchpadMk2 : JykimLaunchpad{
 
 	////////////////////////////////////////////////////////////////////////////
 
+	*setSendA{
+		|sendA|
+		currentSendA = sendA;
+		synthSendA.set(\sendA, currentSendA);
+	}
+
+	*setSendAEffect{
+		|sendAHandler|
+		// synthReverb
+		SynthDef.new("launchpad-SendA", sendAHandler).add;
+
+		Routine {
+			"Waited for set Send A effect".postln;
+			1.wait;
+			this.prSetSendAEffect;
+			"Set Send A effect done".postln;
+		}.play;
+	}
+
+	*prSetSendAEffect{
+		// synthSendA
+		if (synthSendA.notNil, {
+			synthSendA.free;
+		});
+		synthSendA = Synth.new("launchpad-SendA",
+			[
+				\outBus, busMaster,
+				\inBus, busSendA,
+				\sendA, currentSendA
+			],
+			groupEffect
+		);
+	}
+
 	*prSendAOnHandler{
 		|configNoteX, configNoteY|
 		var xy, color;
@@ -944,13 +1142,13 @@ JykimLaunchpadMk2 : JykimLaunchpad{
 
 		this.registerOnControl(arrowUpX, 0, {
 			if (currentSendA < sendAMax, {
-				currentSendA = currentSendA + 1;
+				this.setSendA(currentSendA + 1);
 			});
 			this.onNumPad(currentSendA, color);
 		});
 		this.registerOnControl(arrowDownX, 0, {
 			if (currentSendA > sendAMin,{
-				currentSendA = currentSendA - 1;
+				this.setSendA(currentSendA - 1);
 			});
 			this.onNumPad(currentSendA, color);
 		});
@@ -965,13 +1163,79 @@ JykimLaunchpadMk2 : JykimLaunchpad{
 
 	////////////////////////////////////////////////////////////////////////////
 
+	*setSendB{
+		|sendB|
+		currentSendB = sendB;
+		synthSendB.set(\sendB, currentSendB);
+	}
+
+	*setSendBEffect{
+		|sendBHandler|
+		// synthReverb
+		SynthDef.new("launchpad-SendB", sendBHandler).add;
+
+		Routine {
+			"Waited for set Send B effect".postln;
+			1.wait;
+			this.prSetSendBEffect;
+			"Set Send B effect done".postln;
+		}.play;
+	}
+
+	*prSetSendBEffect{
+		// synthSendB
+		if (synthSendB.notNil, {
+			synthSendB.free;
+		});
+		synthSendB = Synth.new("launchpad-SendB",
+			[
+				\outBus, busMaster,
+				\inBus, busSendB,
+				\sendB, currentSendB
+			],
+			groupEffect
+		);
+	}
+
+	*prSendBOnHandler{
+		|configNoteX, configNoteY|
+		var xy, color;
+
+		xy = this.configNoteXY2NoteXY(configNoteX, configNoteY);
+		color = noteColors[xy[0], xy[1]];
+
+		this.onNumPad(currentSendB, color);
+
+		this.registerOnControl(arrowUpX, 0, {
+			if (currentSendB < sendBMax, {
+				this.setSendB(currentSendB + 1);
+			});
+			this.onNumPad(currentSendB, color);
+		});
+		this.registerOnControl(arrowDownX, 0, {
+			if (currentSendB > sendBMin,{
+				this.setSendB(currentSendB - 1);
+			});
+			this.onNumPad(currentSendB, color);
+		});
+	}
+
+	*prSendBOffHandler{
+		|configNoteX, configNoteY|
+		this.offNumPad();
+		this.freeOnControl(arrowUpX, 0);
+		this.freeOnControl(arrowDownX, 0);
+	}
+
+	////////////////////////////////////////////////////////////////////////////
+
 	*prMuteOnHandler{
 		beforeMuteVolume = currentVolume;
-		currentVolume = 0;
+		this.setVolume(0);
 	}
 
 	*prMuteOffHandler{
-		currentVolume = beforeMuteVolume;
+		this.setVolume(beforeMuteVolume);
 	}
 }
 

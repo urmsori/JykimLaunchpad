@@ -1,9 +1,3 @@
-# jykim Launchpad Supercollider Project
-This project starts to control Novation Launchpad MK2 using Supercollider.  
-It is for my personal use, and anyone can use or copy.
-
-# Example
-```
 s.boot;
 
 (
@@ -79,5 +73,3 @@ JykimLaunchpadMk2.registerOffPlayNote(0,0,{
 	JykimLaunchpadMk2.synthFree(0, 0);
 });
 )
-
-```
