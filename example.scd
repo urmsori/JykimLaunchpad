@@ -5,6 +5,86 @@ JykimLaunchpadMk2.init;
 // JykimLaunchpad.printVerboseOn();
 )
 
+// Example 1 : PlayNote (Global)
+(
+JykimLaunchpadMk2.countPlayNoteX.do{
+	|x|
+	JykimLaunchpadMk2.countPlayNoteY.do{
+		|y|
+		JykimLaunchpadMk2.synthDef(x, y, {
+			|busSendA, busSendB, busMaster, offset = 30|
+			var sig, env, cps;
+
+			cps = JykimLaunchpadMk2.midicpsPlayNote(x, y, offset);
+			sig = LFTri.ar(cps)!2;
+			env = EnvGen.kr(Env.perc, doneAction:2);
+			sig = sig * env * 127.linexp(1,127,0.01,0.3);
+
+			Out.ar(busSendA, sig);
+		}).add;
+
+		JykimLaunchpadMk2.registerOnPlayNote(
+			x,y,{
+				JykimLaunchpadMk2.synthNew(x, y, [
+					\busSendA, JykimLaunchpadMk2.busSendA,
+					\busSendB, JykimLaunchpadMk2.busSendB,
+					\busMaster, JykimLaunchpadMk2.busMaster,
+					\offset, 30
+				]);
+		});
+	}
+};
+)
+
+// Example 2 : Bank
+(
+JykimLaunchpadMk2.countPlayNoteX.do{
+	|x|
+	JykimLaunchpadMk2.countPlayNoteY.do{
+		|y|
+		JykimLaunchpadMk2.synthDef(x, y, {
+			|busSendA, busSendB, busMaster, offset = 30|
+			var sig, env, cps;
+
+			cps = JykimLaunchpadMk2.midicpsPlayNote(x, y, offset);
+			sig = LFTri.ar(cps)!2;
+			env = EnvGen.kr(Env.perc, doneAction:2);
+			sig = sig * env * 127.linexp(1,127,0.01,0.3);
+
+			Out.ar(busSendA, sig);
+		}).add;
+
+		JykimLaunchpadMk2.registerOnBankNote(JykimLaunchpadMk2.bankSession, x, y, {
+			JykimLaunchpadMk2.synthNew(x, y, [
+				\busSendA, JykimLaunchpadMk2.busSendA,
+				\busSendB, JykimLaunchpadMk2.busSendB,
+				\busMaster, JykimLaunchpadMk2.busMaster,
+				\offset, 30
+			]);
+		});
+
+		JykimLaunchpadMk2.registerOnBankNote(JykimLaunchpadMk2.bankUser1, x, y, {
+			JykimLaunchpadMk2.synthNew(x, y, [
+				\busSendA, JykimLaunchpadMk2.busSendA,
+				\busSendB, JykimLaunchpadMk2.busSendB,
+				\busMaster, JykimLaunchpadMk2.busMaster,
+				\offset, 33
+			]);
+		});
+
+		JykimLaunchpadMk2.registerOnBankNote(JykimLaunchpadMk2.bankUser2, x, y, {
+			JykimLaunchpadMk2.synthNew(x, y, [
+				\busSendA, JykimLaunchpadMk2.busSendA,
+				\busSendB, JykimLaunchpadMk2.busSendB,
+				\busMaster, JykimLaunchpadMk2.busMaster,
+				\offset, 35
+			]);
+		});
+	}
+};
+)
+
+// Example 3 : Send A
 (
 JykimLaunchpadMk2.setSendAEffect({
 	|outBus, inBus, sendA|
@@ -20,38 +100,14 @@ JykimLaunchpadMk2.setSendAEffect({
 });
 )
 
+// Example 4 : Toggle Mode
 (
-JykimLaunchpadMk2.countPlayNoteX.do{
-	|x|
-	JykimLaunchpadMk2.countPlayNoteY.do{
-		|y|
-		JykimLaunchpadMk2.synthDef(x, y, {
-			|busSendA, busSendB, busMaster|
-			var sig, env, cps;
+JykimLaunchpadMk2.setToggleModeBankNote(
+	JykimLaunchpadMk2.bankSession,
+	0,0
+);
 
-			cps = JykimLaunchpadMk2.midicpsPlayNote(x, y, 30);
-			sig = LFTri.ar(cps)!2;
-			env = EnvGen.kr(Env.perc, doneAction:2);
-			sig = sig * env * 127.linexp(1,127,0.01,0.3);
-
-			Out.ar(busSendA, sig);
-		}).add;
-
-		JykimLaunchpadMk2.registerOnPlayNote(x,y,{
-			JykimLaunchpadMk2.synthNew(x, y, [
-				\busSendA, JykimLaunchpadMk2.busSendA,
-				\busSendB, JykimLaunchpadMk2.busSendB,
-				\busMaster, JykimLaunchpadMk2.busMaster
-			]);
-		});
-	}
-};
-)
-
-(
-JykimLaunchpadMk2.setToggleModePlayNote(0,0);
-
-JykimLaunchpadMk2.synthDef(0, 0, {
+JykimLaunchpadMk2.synthDefBank(JykimLaunchpadMk2.bankSession, 0, 0, {
 	|busSendA, busSendB, busMaster|
 	var sig, env, cps;
 
@@ -61,15 +117,15 @@ JykimLaunchpadMk2.synthDef(0, 0, {
 	Out.ar(busSendB, sig);
 }).add;
 
-JykimLaunchpadMk2.registerOnPlayNote(0,0,{
-	JykimLaunchpadMk2.synthNew(0, 0, [
+JykimLaunchpadMk2.registerOnBankNote(JykimLaunchpadMk2.bankSession, 0, 0,{
+	JykimLaunchpadMk2.synthNewBank(JykimLaunchpadMk2.bankSession, 0, 0, [
 		\busSendA, JykimLaunchpadMk2.busSendA,
 		\busSendB, JykimLaunchpadMk2.busSendB,
 		\busMaster, JykimLaunchpadMk2.busMaster
 	]);
 });
 
-JykimLaunchpadMk2.registerOffPlayNote(0,0,{
+JykimLaunchpadMk2.registerOffBankNote(JykimLaunchpadMk2.bankSession, 0,0,{
 	JykimLaunchpadMk2.synthFree(0, 0);
 });
 )
