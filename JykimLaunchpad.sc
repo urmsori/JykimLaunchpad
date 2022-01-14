@@ -49,6 +49,7 @@ JykimLaunchpad {
 	}
 
 	*init {
+		|isMidiAutoConnected = false|
 		var midiSource, midiDest;
 
 		this.printVerboseOff();
@@ -93,10 +94,12 @@ JykimLaunchpad {
 				a.name.contains("Launchpad")
 			};
 
-			MIDIIn.connect(0, midiSource.uid);
-
 			padOut = MIDIOut(0, midiDest.uid);
-			MIDIOut.connect(0, midiDest.uid);
+
+			if (isMidiAutoConnected.not, {
+				MIDIIn.connect(0, midiSource.uid);
+				MIDIOut.connect(0, midiDest.uid);
+			});
 
 			MIDIdef.noteOn(\JykimLaunchpadNoteOn, {
 				|veloc, num, chan, src|
@@ -827,8 +830,9 @@ JykimLaunchpadMk2 : JykimLaunchpad{
 	classvar bankModes;
 
 	*init {
+		|isMidiAutoConnected = false|
 		var result;
-		result = super.init;
+		result = super.init(isMidiAutoConnected);
 
 		if (result.not,{
 			^false;
@@ -1081,7 +1085,7 @@ JykimLaunchpadMk2 : JykimLaunchpad{
 	*prSynthRecordInit{
 		// Record Def
 		SynthDef("launchpad-Record", {
-			|buffer, inBus = 0, threshold_amp = 0, buttonOn = 0, recordHold = 0|
+			|buffer, inBus = 0, threshold_amp = 0.00001, buttonOn = 0, recordHold = 0|
 			var input, mixed, amp, recordOn, recordOnScaled, phase, frameMax;
 			input = In.ar(inBus, 2);
 			mixed = Mix(input);
@@ -1146,7 +1150,7 @@ JykimLaunchpadMk2 : JykimLaunchpad{
 
 		Routine {
 			"Waited for init launchpad record synth".postln;
-			1.wait;
+			3.wait;
 			this.prSynthRecordNew();
 			"Init launchpad record synth done".postln;
 		}.play;
