@@ -1221,6 +1221,7 @@ JykimLaunchpadMk2 : JykimLaunchpad{
 		var synthDefName, synth;
 		synthDefName = this.getSynthDefName(playNoteX, playNoteY);
 		synth = Synth.new(synthDefName, args, group, addAction);
+		synth.register;
 		synthPlayNotes[playNoteX, playNoteY] = synth;
 		^synth;
 	}
@@ -1229,6 +1230,7 @@ JykimLaunchpadMk2 : JykimLaunchpad{
 		var synthDefName, synth;
 		synthDefName = this.getSynthDefBankName(bank, playNoteX, playNoteY);
 		synth = Synth.new(synthDefName, args, group, addAction);
+		synth.register;
 		synthPlayNotes[playNoteX, playNoteY] = synth;
 		^synth;
 	}
@@ -1236,8 +1238,11 @@ JykimLaunchpadMk2 : JykimLaunchpad{
 	*synthFree{
 		|playNoteX, playNoteY|
 		var synth;
-		if (synthPlayNotes[playNoteX, playNoteY].notNil,{
-			synthPlayNotes[playNoteX, playNoteY].free;
+		synth = synthPlayNotes[playNoteX, playNoteY];
+		if (synth.notNil,{
+			if (synth.isPlaying,{
+				synthPlayNotes[playNoteX, playNoteY].free;
+			});
 		});
 		synthPlayNotes[playNoteX, playNoteY] = nil;
 		this.offColorPlayNote(playNoteX, playNoteY);
