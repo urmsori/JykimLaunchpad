@@ -1,7 +1,7 @@
 (
 s.waitForBoot{
 
-	JykimLaunchpadMk2.init(isMidiAutoConnected: false);
+	JykimLaunchpadMk2.init(isMidiAutoConnected: true);
 	// JykimLaunchpad.printVerboseOn();
 
 	Routine {
@@ -52,11 +52,11 @@ s.waitForBoot{
 
 					in = in * EnvGen.ar(Env.adsr(
 						attackTime:0.1,
-						sustainLevel:0.7,
+						sustainLevel:0.5,
 						releaseTime:2.0
 					), gate:gate, doneAction: Done.freeSelf);
 
-					Out.ar(busSendA, in);
+					Out.ar(busSendA, in*0.5);
 				}).add;
 
 				JykimLaunchpadMk2.setToggleModeBankNote(
