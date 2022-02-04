@@ -1,7 +1,7 @@
 (
 s.waitForBoot{
 
-	JykimLaunchpadMk2.init(isMidiAutoConnected: true);
+	JykimLaunchpadMk2.init(isMidiAutoConnected: false);
 	// JykimLaunchpad.printVerboseOn();
 
 	Routine {

@@ -23,13 +23,15 @@ JykimLaunchpad {
 
 	classvar noteOnHandlers;
 	classvar noteOffHandlers;
-	classvar noteColors;
+	classvar noteOnColors;
+	classvar noteOffColors;
 	classvar noteModes;
 	classvar noteExclusives;
 
 	classvar controlOnHandlers;
 	classvar controlOffHandlers;
-	classvar controlColors;
+	classvar controlOnColors;
+	classvar controlOffColors;
 	classvar controlModes;
 	classvar controlExclusives;
 
@@ -56,13 +58,15 @@ JykimLaunchpad {
 
 		noteOnHandlers = Array2D.new(countNoteX, countNoteY);
 		noteOffHandlers = Array2D.new(countNoteX, countNoteY);
-		noteColors = Array2D.new(countNoteX, countNoteY);
+		noteOnColors = Array2D.new(countNoteX, countNoteY);
+		noteOffColors = Array2D.new(countNoteX, countNoteY);
 		noteModes = Array2D.new(countNoteX, countNoteY);
 		noteExclusives = Array2D.new(countNoteX, countNoteY);
 
 		controlOnHandlers = Array2D.new(countControlX, countControlY);
 		controlOffHandlers = Array2D.new(countControlX, countControlY);
-		controlColors = Array2D.new(countControlX, countControlY);
+		controlOnColors = Array2D.new(countControlX, countControlY);
+		controlOffColors = Array2D.new(countControlX, countControlY);
 		controlModes = Array2D.new(countControlX, countControlY);
 		controlExclusives = Array2D.new(countControlX, countControlY);
 
@@ -71,6 +75,8 @@ JykimLaunchpad {
 			countNoteY.do{
 				|y|
 				noteModes[x,y] = modeOnOff;
+				noteOnColors[x,y] = 0;
+				noteOffColors[x,y] = 0;
 			}
 		};
 		countControlX.do{
@@ -78,6 +84,8 @@ JykimLaunchpad {
 			countControlY.do{
 				|y|
 				controlModes[x,y] = modeOnOff;
+				controlOnColors[x,y] = 0;
+				controlOffColors[x,y] = 0;
 			}
 		};
 
@@ -284,22 +292,24 @@ JykimLaunchpad {
 			handler.value();
 		});
 
-		color = switch (midiType,
-			midiTypeNote,   { noteColors[x, y] },
-			midiTypeControl, { controlColors[x, y] }
-		);
-		if ( color.notNil, {
-			if ( isOn, {
-				switch (midiType,
-					midiTypeNote,   { this.onColorNote(x,y,color); },
-					midiTypeControl, { this.onColorControl(x,y,color); }
-				);
-			}, {
-				switch (midiType,
-					midiTypeNote,   { this.offColorNote(x,y); },
-					midiTypeControl, { this.offColorControl(x,y); }
-				);
-			});
+		if ( isOn, {
+			color = switch (midiType,
+				midiTypeNote,   { noteOnColors[x, y] },
+				midiTypeControl, { controlOnColors[x, y] }
+			);
+			switch (midiType,
+				midiTypeNote,   { this.onColorNote(x,y,color); },
+				midiTypeControl, { this.onColorControl(x,y,color); }
+			);
+		}, {
+			color = switch (midiType,
+				midiTypeNote,   { noteOffColors[x, y] },
+				midiTypeControl, { controlOffColors[x, y] }
+			);
+			switch (midiType,
+				midiTypeNote,   { this.offColorNote(x,y,color); },
+				midiTypeControl, { this.offColorControl(x,y,color); }
+			);
 		});
 	}
 
@@ -423,19 +433,35 @@ JykimLaunchpad {
 		|playNoteX, playNoteY, color|
 		var xy;
 		xy = this.playNoteXY2NoteXY(playNoteX, playNoteY);
-		noteColors[xy[0], xy[1]] = color;
+		noteOnColors[xy[0], xy[1]] = color;
+	}
+	*setOffColorPlayNote{
+		|playNoteX, playNoteY, color|
+		var xy;
+		xy = this.playNoteXY2NoteXY(playNoteX, playNoteY);
+		noteOffColors[xy[0], xy[1]] = color;
 	}
 
 	*setColorConfigNote{
 		|configNoteX, configNoteY, color|
 		var xy;
 		xy = this.configNoteXY2NoteXY(configNoteX, configNoteY);
-		noteColors[xy[0], xy[1]] = color;
+		noteOnColors[xy[0], xy[1]] = color;
+	}
+	*setOffColorConfigNote{
+		|configNoteX, configNoteY, color|
+		var xy;
+		xy = this.configNoteXY2NoteXY(configNoteX, configNoteY);
+		noteOffColors[xy[0], xy[1]] = color;
 	}
 
 	*setColorControl{
 		|controlX, controlY, color|
-		controlColors[controlX,controlY] = color;
+		controlOnColors[controlX,controlY] = color;
+	}
+	*setOffColorControl{
+		|controlX, controlY, color|
+		controlOffColors[controlX,controlY] = color;
 	}
 
 	*setColorAll{
@@ -463,6 +489,29 @@ JykimLaunchpad {
 		};
 	}
 
+	*setOffColorPlayNoteLineCMajor{
+		|startY, endY, color|
+		var startNum;
+		startNum = this.midinumPlayNote(0, startY);
+		JykimLaunchpadMk2.countPlayNoteX.do{
+			|x|
+			(startY..endY).do{
+				|y|
+				var num, diff;
+				num = this.midinumPlayNote(x, y);
+				diff = num - startNum;
+
+				[0,2,4,5,7,9,11,12,14].do{
+					|target|
+					if (diff == target,{
+						this.setOffColorPlayNote(x, y, color);
+						this.offColorPlayNote(x, y, color);
+					});
+				};
+			};
+		};
+	}
+
 	////////////////////////////////////////////////////////////////////////////
 
 	*offColorAll{
@@ -470,19 +519,19 @@ JykimLaunchpad {
 			|x|
 			countNoteY.do{
 				|y|
-				this.offColorNote(x, y);
+				this.offColorNote(x, y, noteOffColors[x,y]);
 			}
 		};
 		countControlX.do{
 			|x|
 			countControlY.do{
 				|y|
-				this.offColorControl(x, y);
+				this.offColorControl(x, y, controlOffColors[x,y]);
 			}
 		};
 	}
 
-	*prOnColorNote{
+	*prChangeColorNote{
 		|num, color|
 		padOut.noteOn(0, num, color);
 	}
@@ -490,45 +539,41 @@ JykimLaunchpad {
 		|x, y, color|
 		var num;
 		num = this.noteXY2Num(x, y);
-		this.prOnColorNote(num, color);
+		this.prChangeColorNote(num, color);
 	}
 	*onColorPlayNote{
 		|playNoteX, playNoteY, color|
 		var num;
 		num = this.playNoteXY2Num(playNoteX, playNoteY);
-		this.prOnColorNote(num, color);
+		this.prChangeColorNote(num, color);
 	}
 	*onColorConfigNote{
 		|configNoteX, configNoteY, color|
 		var num;
 		num = this.configNoteXY2Num(configNoteX, configNoteY);
-		this.prOnColorNote(num, color);
+		this.prChangeColorNote(num, color);
 	}
 
-	*prOffColorNote{
-		|num|
-		padOut.noteOff(0, num, 0);
-	}
 	*offColorNote{
-		|x, y|
+		|x, y, color = 0|
 		var num;
 		num = this.noteXY2Num(x, y);
-		this.prOffColorNote(num);
+		this.prChangeColorNote(num, color);
 	}
 	*offColorPlayNote{
-		|playNoteX, playNoteY|
+		|playNoteX, playNoteY, color = 0|
 		var num;
 		num = this.playNoteXY2Num(playNoteX, playNoteY);
-		this.prOffColorNote(num);
+		this.prChangeColorNote(num, color);
 	}
 	*offColorConfigNote{
-		|configNoteX, configNoteY|
+		|configNoteX, configNoteY, color = 0|
 		var num;
 		num = this.configNoteXY2Num(configNoteX, configNoteY);
-		this.prOffColorNote(num);
+		this.prChangeColorNote(num, color);
 	}
 
-	*prOnColorControl{
+	*prChangeColorControl{
 		|num, color|
 		padOut.control(0, num, color);
 	}
@@ -536,18 +581,14 @@ JykimLaunchpad {
 		|controlX, controlY, color|
 		var num;
 		num = this.controlXY2Num(controlX, controlY);
-		this.prOnColorControl(num, color);
+		this.prChangeColorControl(num, color);
 	}
 
-	*prOffColorControl{
-		|num|
-		padOut.control(0, num, 0);
-	}
 	*offColorControl{
-		|controlX, controlY|
+		|controlX, controlY, color = 0|
 		var num;
 		num = this.controlXY2Num(controlX, controlY);
-		this.prOffColorControl(num);
+		this.prChangeColorControl(num, color);
 	}
 
 	////////////////////////////////////////////////////////////////////////////
@@ -653,11 +694,16 @@ JykimLaunchpad {
 
 	////////////////////////////////////////////////////////////////////////////
 
+	*midinumPlayNote{
+		|playNoteX, playNoteY, offset = 0|
+		var num;
+		num = playNoteX + (playNoteY * this.countPlayNoteX) + offset;
+		^num;
+	}
 	*midicpsPlayNote{
 		|playNoteX, playNoteY, offset = 0|
 		var num;
-		num = this.playNoteXY2Num(playNoteX, playNoteY);
-		num = num + offset;
+		num = this.midinumPlayNote(playNoteX, playNoteY, offset);
 		^num.midicps;
 	}
 }
@@ -1235,6 +1281,18 @@ JykimLaunchpadMk2 : JykimLaunchpad{
 		^synth;
 	}
 
+	*synthSet{
+		|playNoteX, playNoteY, args|
+		var synth;
+		synth = synthPlayNotes[playNoteX, playNoteY];
+		synth.set(*args);
+		^synth;
+	}
+	*synthSetBank{
+		|playNoteX, playNoteY, args|
+		^synthSet(playNoteX, playNoteY, args);
+	}
+
 	*synthFree{
 		|playNoteX, playNoteY|
 		var synth;
@@ -1245,7 +1303,6 @@ JykimLaunchpadMk2 : JykimLaunchpad{
 			});
 		});
 		synthPlayNotes[playNoteX, playNoteY] = nil;
-		this.offColorPlayNote(playNoteX, playNoteY);
 	}
 
 	*synthFreeAll{
@@ -1297,7 +1354,7 @@ JykimLaunchpadMk2 : JykimLaunchpad{
 		var xy, color;
 
 		xy = this.configNoteXY2NoteXY(configNoteX, configNoteY);
-		color = noteColors[xy[0], xy[1]];
+		color = noteOnColors[xy[0], xy[1]];
 
 		this.onNumPad(currentVolume, color);
 
@@ -1335,7 +1392,7 @@ JykimLaunchpadMk2 : JykimLaunchpad{
 		var xy, color;
 
 		xy = this.configNoteXY2NoteXY(configNoteX, configNoteY);
-		color = noteColors[xy[0], xy[1]];
+		color = noteOnColors[xy[0], xy[1]];
 
 		this.onNumPad(currentPan, color);
 
@@ -1401,7 +1458,7 @@ JykimLaunchpadMk2 : JykimLaunchpad{
 		var xy, color;
 
 		xy = this.configNoteXY2NoteXY(configNoteX, configNoteY);
-		color = noteColors[xy[0], xy[1]];
+		color = noteOnColors[xy[0], xy[1]];
 
 		this.onNumPad(currentSendA, color);
 
@@ -1467,7 +1524,7 @@ JykimLaunchpadMk2 : JykimLaunchpad{
 		var xy, color;
 
 		xy = this.configNoteXY2NoteXY(configNoteX, configNoteY);
-		color = noteColors[xy[0], xy[1]];
+		color = noteOnColors[xy[0], xy[1]];
 
 		this.onNumPad(currentSendB, color);
 
@@ -1578,6 +1635,7 @@ JykimLaunchpadMk2 : JykimLaunchpad{
 			countPlayNoteY.do{
 				|playNoteY|
 				this.synthFree(playNoteX, playNoteY);
+				this.offColorAll();
 				this.registerOnPlayNote(
 					playNoteX, playNoteY,
 					bankOnHandlers[bank][playNoteX][playNoteY]
